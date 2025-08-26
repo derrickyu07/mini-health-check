@@ -1,0 +1,41 @@
+name: Deploy Web to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+
+permissions:
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: github-pages, path: ./artifact }
+        continue-on-error: true
+      - uses: actions/download-artifact@v4
+        with: { name: web-dist, path: ./artifact }
+        continue-on-error: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '18' }
+      - name: Build web (fresh) # ensures artifact exists even if workflow_run path
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - uses: actions/deploy-pages@v4
